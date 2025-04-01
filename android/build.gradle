@@ -1,3 +1,8 @@
+package android
+
+group 'com.kasem.receive_sharing_intent'
+version '1.6.6'
+
 buildscript {
     ext.kotlin_version = '1.9.22'
     repositories {
@@ -6,18 +11,10 @@ buildscript {
     }
 
     dependencies {
-        classpath 'com.android.tools.build:gradle:7.3.1'
+        classpath 'com.android.tools.build:gradle:7.5.0'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
     }
 }
-
-plugins {
-    id "com.android.library"
-    id "kotlin-android"
-}
-
-group 'com.kasem.receive_sharing_intent'
-version '1.6.6'
 
 rootProject.allprojects {
     repositories {
@@ -26,29 +23,35 @@ rootProject.allprojects {
     }
 }
 
+apply plugin: 'com.android.library'
+apply plugin: 'kotlin-android'
+
 android {
-    if (project.android.hasProperty("namespace")) {
-        namespace 'com.kasem.receive_sharing_intent'
-    }
+    namespace 'com.kasem.receive_sharing_intent'
+    compileSdkVersion 33
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
     }
 
     kotlinOptions {
         jvmTarget = '1.8'
     }
 
-    sourceSets {
-        main.java.srcDirs += 'src/main/kotlin'
-    }
     defaultConfig {
-        compileSdk 34
-        minSdkVersion 19
-        testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
+        minSdkVersion 16
+        targetSdkVersion 33
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
+
     lintOptions {
         disable 'InvalidPackage'
     }
+}
+
+dependencies {
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'androidx.core:core-ktx:1.10.1'
 }
