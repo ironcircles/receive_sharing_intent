@@ -1,3 +1,5 @@
+package android
+
 group 'com.kasem.receive_sharing_intent'
 version '1.0'
 
