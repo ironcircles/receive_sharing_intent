@@ -12,10 +12,51 @@ import java.io.File
 import java.io.FileOutputStream
 import java.util.*
 import android.webkit.MimeTypeMap
-import android.util.Log
 
 
 object FileDirectory {
+
+    /** Shared copies go in cacheDir/shared/<random>/<name>. */
+    private const val SHARED_DIR = "shared"
+
+    /**
+     * The sending app chooses `_display_name`, so it is untrusted: only its
+     * last path segment is kept, and ".", ".." or an empty name gives none.
+     * Before this, a name like "../shared_prefs/x.xml" wrote outside the
+     * cache (any installed app could overwrite the receiving app's private
+     * files, natively, before the app's own code ran).
+     */
+    internal fun safeName(raw: String?): String? {
+        if (raw == null) return null
+        val base = raw.replace('\\', '/').substringAfterLast('/').trim()
+        if (base.isEmpty() || base == "." || base == ".." || base.contains('\u0000')) return null
+        return base.take(200)
+    }
+
+    /** A new folder for one shared file, inside the cache. */
+    private fun newShareDir(context: Context): File {
+        val dir = File(File(context.cacheDir, SHARED_DIR), UUID.randomUUID().toString())
+        dir.mkdirs()
+        return dir
+    }
+
+    /** True when [file] resolves inside [dir] (no "..", no symlink out). */
+    private fun isInside(dir: File, file: File): Boolean {
+        val root = dir.canonicalFile
+        val target = file.canonicalFile
+        return target.path.startsWith(root.path + File.separator)
+    }
+
+    /**
+     * A path another app handed us (file:// or a provider's `_data`) is
+     * used as is, so it must not point into this app's own private
+     * storage: the app would read (and could import) its own files.
+     */
+    private fun outsideOwnData(context: Context, path: String?): String? {
+        if (path == null) return null
+        val own = File(context.applicationInfo.dataDir)
+        return if (isInside(own, File(path))) null else path
+    }
 
     /**
      * Get a file path from a Uri. This will get the the path for Storage Access
@@ -74,7 +115,7 @@ object FileDirectory {
             return getDataColumn(context, uri, null, null)
         }
 
-        return uri.path
+        return outsideOwnData(context, uri.path)
     }
 
     /**
@@ -100,10 +141,9 @@ object FileDirectory {
                 if (cursor != null && cursor.moveToFirst()) {
                     val columnIndex = cursor.getColumnIndex(column)
                     if (columnIndex != -1) {
-                        val fileName = cursor.getString(columnIndex)
+                        val fileName = safeName(cursor.getString(columnIndex))
                         if (fileName != null) {
-                            Log.i("FileDirectory", "File name: $fileName")
-                            targetFile = File(context.cacheDir, fileName)
+                            targetFile = File(newShareDir(context), fileName)
                         }
                     }
                 }
@@ -121,8 +161,10 @@ object FileDirectory {
                     }
                 }
                 val type = MimeTypeMap.getSingleton().getExtensionFromMimeType(mimeType)
-                targetFile = File(context.cacheDir, "${prefix}_${Date().time}.$type")
+                targetFile = File(newShareDir(context), "${prefix}_${Date().time}.$type")
             }
+
+            if (!isInside(File(context.cacheDir, SHARED_DIR), targetFile)) return null
 
             context.contentResolver.openInputStream(uri)?.use { input ->
                 FileOutputStream(targetFile).use { fileOut ->
@@ -140,7 +182,7 @@ object FileDirectory {
             cursor = context.contentResolver.query(uri, projection, selection, selectionArgs, null)
             if (cursor != null && cursor.moveToFirst()) {
                 val columnIndex = cursor.getColumnIndexOrThrow(column)
-                return cursor.getString(columnIndex)
+                return outsideOwnData(context, cursor.getString(columnIndex))
             }
         } finally {
             cursor?.close()
