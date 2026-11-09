@@ -190,7 +190,13 @@ class ReceiveSharingIntentPlugin : FlutterPlugin, ActivityAware, MethodCallHandl
         if (type != MediaType.VIDEO) return null // get video thumbnail only
 
         val videoFile = File(path)
-        val targetFile = File(applicationContext.cacheDir, "${videoFile.name}.png")
+        // Next to the video's copy when it is one of ours (its own folder in
+        // the cache); never next to a file elsewhere (the person's DCIM).
+        val cache = applicationContext.cacheDir.canonicalPath + File.separator
+        val parent = videoFile.parentFile
+        val dir = if (parent != null && parent.canonicalPath.startsWith(cache)) parent
+                  else applicationContext.cacheDir
+        val targetFile = File(dir, "${videoFile.name}.png")
         val bitmap = ThumbnailUtils.createVideoThumbnail(path, MediaStore.Video.Thumbnails.MINI_KIND)
                 ?: return null
         FileOutputStream(targetFile).use { out ->
