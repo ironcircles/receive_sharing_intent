@@ -137,7 +137,11 @@ object FileDirectory {
             val projection = arrayOf(column)
             var targetFile: File? = null
             try {
-                cursor = context.contentResolver.query(uri, projection, selection, selectionArgs, null)
+                cursor = try {
+                    context.contentResolver.query(uri, projection, selection, selectionArgs, null)
+                } catch (e: Exception) {
+                    null
+                }
                 if (cursor != null && cursor.moveToFirst()) {
                     val columnIndex = cursor.getColumnIndex(column)
                     if (columnIndex != -1) {
@@ -166,10 +170,19 @@ object FileDirectory {
 
             if (!isInside(File(context.cacheDir, SHARED_DIR), targetFile)) return null
 
-            context.contentResolver.openInputStream(uri)?.use { input ->
-                FileOutputStream(targetFile).use { fileOut ->
-                    input.copyTo(fileOut)
-                }
+            // A share that can't be read (no such provider, no permission)
+            // gives nothing; before, the exception escaped while the plugin
+            // was registering and sharing stopped working until a restart.
+            try {
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    FileOutputStream(targetFile).use { fileOut ->
+                        input.copyTo(fileOut)
+                    }
+                } ?: return null
+            } catch (e: Exception) {
+                targetFile.delete()
+                targetFile.parentFile?.delete()
+                return null
             }
             return targetFile.path
         }
